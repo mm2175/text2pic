@@ -2,14 +2,15 @@ package text2pic
 
 import (
 	"fmt"
-	"github.com/golang/freetype/truetype"
-	"golang.org/x/image/math/fixed"
 	"image"
 	"image/color"
 	"image/draw"
 	"image/jpeg"
 	"image/png"
 	"io"
+
+	"github.com/golang/freetype/truetype"
+	"golang.org/x/image/math/fixed"
 )
 
 type Color image.Image
@@ -66,9 +67,7 @@ func (this *TextPicture) AddPictureLine(reader io.Reader, padding Padding) {
 	this.lines = append(this.lines, picline)
 }
 
-func (this *TextPicture) Draw(writer io.Writer, filetype int) error {
-	var err error
-	// Initialize the context.
+func (this *TextPicture) DrawToImage() (image.Image, error) {
 	height := 0
 	width := this.conf.Width
 	rgba := image.NewRGBA(image.Rect(0, 0, width, height))
@@ -80,20 +79,27 @@ func (this *TextPicture) Draw(writer io.Writer, filetype int) error {
 	pt := fixed.Point26_6{X: fixed.Int26_6(0), Y: fixed.Int26_6(0)}
 	for _, v := range this.lines {
 		if e := v.draw(this.conf.Width, &pt, rgba); e != nil {
-			fmt.Println("draw error :", e)
+			return nil, fmt.Errorf("draw %v: %v", v, e)
 		}
 	}
+
+	return rgba, nil
+}
+
+func (this *TextPicture) Draw(writer io.Writer, filetype int) error {
+	img, err := this.DrawToImage()
+	if err != nil {
+		return err
+	}
 	if filetype == TypePng {
-		err = png.Encode(writer, rgba)
+		err = png.Encode(writer, img)
 		if err != nil {
 			return err
-
 		}
 	} else {
-		err = jpeg.Encode(writer, rgba, nil)
+		err = jpeg.Encode(writer, img, nil)
 		if err != nil {
 			return err
-
 		}
 	}
 	return nil
